@@ -1,4 +1,4 @@
-# liveAPI_Demo_CPP
+# Sensum API Demo C++
 Codebase for demo of the Sensum live API in C++
 
 Contact - support@sensum.co
