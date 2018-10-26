@@ -17,12 +17,12 @@ libcurl - curl
 
 config.cpp needs to be populated with your credentials for Sensum API access etc:
 
-apikey
-region
-clientId
-userPoolId
-identityPoolId
-username
-password
+* apikey
+* region
+* clientId
+* userPoolId
+* identityPoolId
+* username
+* password
 
 In the config file you can also set the input file (csvFile) and output file names (outputCSV / outputTXT)
