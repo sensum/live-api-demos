@@ -9,11 +9,11 @@ Contact - support@sensum.co
 
 AWS SDK - https://github.com/aws/aws-sdk-cpp
 
-libcrypto - openSSL
+libcrypto - openSSL (Win64 version 1.1.1) - http://slproweb.com/products/Win32OpenSSL.html
 
-libcurl - curl
+libcurl - curl (Download the pre-build curl (curldemo) for both x86 and x64, add the desired one to the project) - https://mariusbancila.ro/blog/2018/03/13/using-curl-library-from-c-on-windows/
 
-boost - https://www.boost.org/
+boost (version 1.67.0) - https://www.boost.org/
 
 rapidjson - https://github.com/Tencent/rapidjson
 ***
