@@ -221,7 +221,7 @@ int writeResponseToCSV(std::string fileName, std::string &response) {
 	json.Parse(resp);
 
 	std::string arousalDominant = json["stats"]["arousal"]["dominant"].GetString();
-	float arousalVal = json["stats"]["arousal"]["sectors"]["relaxed"].GetFloat();
+	float arousalVal = json["stats"]["arousal"]["value"].GetFloat();
 	float arousalSecRelaxed = json["stats"]["arousal"]["sectors"]["relaxed"].GetFloat();
 	float arousalSecPassive = json["stats"]["arousal"]["sectors"]["passive"].GetFloat();
 	float arousalSecCalm = json["stats"]["arousal"]["sectors"]["calm"].GetFloat();
