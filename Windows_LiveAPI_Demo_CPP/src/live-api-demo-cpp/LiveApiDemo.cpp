@@ -12,12 +12,14 @@
 #include <boost/algorithm/string.hpp>
 #include <fstream>
 #include <thread>
-#include "CurlDebug.h"
+//#include "CurlDebug.h"
 #include "Config.cpp"
 #include "CognitoAuth.cpp"
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
+#include "rapidjson/error/en.h"
+
 
 std::string getISOTime() {
 	time_t now;
@@ -91,12 +93,21 @@ std::string callAPI(Config &config, bool debug = false) {
 	//struct curlDebug::data curlConfig;
 	std::string response;
 
+	if (debug) {
+		//curlConfig.trace_ascii = 1; //enable ascii tracing
+	}
+
 	//In windows, this will init the winsock stuff
 	curl_global_init(CURL_GLOBAL_ALL);
 
 	//get curl handle
 	curl = curl_easy_init();
 	if (curl) {
+		if (debug) {
+			//curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curlDebug::my_trace);
+			//curl_easy_setopt(curl, CURLOPT_DEBUGDATA, &curlConfig);
+		}
+
 		//set URL
 		std::string reqUrl = "https://" + config.host + config.canonical_uri;
 		curl_easy_setopt(curl, CURLOPT_URL, reqUrl.c_str());
@@ -179,6 +190,7 @@ int awsCognitoAuthenticate(Config &config) {
 
 std::vector<std::vector<std::string> > getCSVData(std::string &fileName, std::string &delimiter) {
 	std::ifstream file(fileName);
+
 	std::vector<std::vector<std::string> > dataList;
 
 	std::string line = "";
@@ -211,48 +223,53 @@ int writeToFile(std::string &fileName, std::string &data) {
 }
 
 int writeResponseToCSV(std::string fileName, std::string &response) {
-	//Parse a JSON string into DOM:
-	char * resp = new char[response.length() + 1];
-	strcpy(resp, response.c_str());
-	//Note: rapidjson has been used an example to parse the API response
-	//To be aware that sometimes few asserstions fails in rapidjson during parsing the API response
-	//Either rapidjson would need to be modified accordingly to handle it or a different parser can be used
-	rapidjson::Document json;
-	json.Parse(resp);
 
-	std::string arousalDominant = json["stats"]["arousal"]["dominant"].GetString();
-	float arousalVal = json["stats"]["arousal"]["value"].GetFloat();
-	float arousalSecRelaxed = json["stats"]["arousal"]["sectors"]["relaxed"].GetFloat();
-	float arousalSecPassive = json["stats"]["arousal"]["sectors"]["passive"].GetFloat();
-	float arousalSecCalm = json["stats"]["arousal"]["sectors"]["calm"].GetFloat();
-	float arousalSecActivated = json["stats"]["arousal"]["sectors"]["activated"].GetFloat();
-	float arousalSecExcited = json["stats"]["arousal"]["sectors"]["excited"].GetFloat();
+	//blank response strings for empty response:
+	std::string arousalDominant = "";
+	std::string arousalVal = "";
+	std::string arousalSecRelaxed = "";
+	std::string arousalSecPassive = "";
+	std::string arousalSecCalm = "";
+	std::string arousalSecActivated = "";
+	std::string arousalSecExcited = "";
 
-	//compile csv line:
-	std::string writeData = arousalDominant + ","
-		+ std::to_string(arousalVal) + ","
-		+ std::to_string(arousalSecRelaxed) + ","
-		+ std::to_string(arousalSecPassive) + ","
-		+ std::to_string(arousalSecCalm) + ","
-		+ std::to_string(arousalSecActivated) + ","
-		+ std::to_string(arousalSecExcited) + ","
-		+ "\n";
+	try {
+		//Parse a JSON string into DOM:
+		char * resp = new char[response.length() + 1];
+		strcpy(resp, response.c_str());
+		//Note: rapidjson has been used an example to parse the API response
+		rapidjson::Document json;
+		if (json.Parse(resp).HasParseError()) {
+			//In case of parsing errors skip writing parsed json response to CSV
+			//Due to parsing errors few asserstions fail in rapidjson which terminates the application
+		} else {
+			// write the valid parsed json response only to CSV
+			arousalDominant = json["stats"]["arousal"]["dominant"].GetString();
+			if (json["stats"]["arousal"]["value"].IsFloat()) arousalVal = std::to_string(json["stats"]["arousal"]["value"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["relaxed"].IsFloat()) arousalSecRelaxed = std::to_string(json["stats"]["arousal"]["sectors"]["relaxed"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["passive"].IsFloat()) arousalSecPassive = std::to_string(json["stats"]["arousal"]["sectors"]["passive"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["calm"].IsFloat()) arousalSecCalm = std::to_string(json["stats"]["arousal"]["sectors"]["calm"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["activated"].IsFloat()) arousalSecActivated = std::to_string(json["stats"]["arousal"]["sectors"]["activated"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["excited"].IsFloat()) arousalSecExcited = std::to_string(json["stats"]["arousal"]["sectors"]["excited"].GetFloat());
 
-	//  //modify it by DOM.
-	//  rapidjson::Value& s = d["stars"];
-	//  s.SetInt(s.GetInt() + 1);
+			//compile csv line:
+			std::string writeData = arousalDominant + ","
+				+ arousalVal + ","
+				+ arousalSecRelaxed + ","
+				+ arousalSecPassive + ","
+				+ arousalSecCalm + ","
+				+ arousalSecActivated + ","
+				+ arousalSecExcited + ","
+				+ "\n";
 
-	//  //Convert JSON back to string:
-	//  rapidjson::StringBuffer buffer;
-	//  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-	//  json.Accept(writer);
+			writeToFile(fileName, writeData);
+		}
 
-	//  //write full JSON to file:
-	//  std::string data = buffer.GetString();
-	//  data += "\n";
-	//  std::string fileName = "responses.txt";
 
-	writeToFile(fileName, writeData);
+	}
+	catch (...) {
+		std::cout << "Response JSON not valid, readable, or error in parsing" << std::endl;
+	}
 
 	return 0;
 }
@@ -279,7 +296,10 @@ int writeCSVHeader(std::string &fileName) {
 
 void processData(Config &config, bool debug) {
 	//iterate through CSV data:
+	int rowNum = 0;
 	for (const auto& inner : config.csvData) {
+		std::cout << "Sending row: " << rowNum << std::endl;
+		rowNum++;
 		//CSV col0 time, col1 value:
 		//std::string time  = inner[0];
 
@@ -297,19 +317,15 @@ void processData(Config &config, bool debug) {
 		//Perform API call, add 2nd param 'true' for debug:
 		std::string response = callAPI(config, debug);
 
-		std::cout << "response is \n";
-		std::cout << response << "\n";
-
 		writeResponseToText(config.outputTXT, response);
 		writeResponseToCSV(config.outputCSV, response);
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 	}
 }
 
 int main() {
-	std::cout << "running \n";
-	bool debug = true;
+	bool debug = false;
 
 	Config config;
 
@@ -318,19 +334,19 @@ int main() {
 
 	//AWS SDK init:
 	Aws::SDKOptions options;
-	options.loggingOptions.logLevel = Aws::Utils::Logging::LogLevel::Fatal;
 	Aws::InitAPI(options);
 
 	//Authenticate user with AWS Cognito & get tokens (tokens need to be refreshed after 60 minutes):
-    awsCognitoAuthenticate(config);
+	awsCognitoAuthenticate(config);
 
 	//init csv header:
-    writeCSVHeader(config.outputCSV);
+	writeCSVHeader(config.outputCSV);
 
-    processData(config, debug);
+	processData(config, debug);
 
 	//Cleanup
 	Aws::ShutdownAPI(options);
+
 
 	//  while (true) {
 	//    std::string user_input;

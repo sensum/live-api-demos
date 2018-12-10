@@ -220,47 +220,55 @@ int writeToFile(std::string &fileName, std::string &data) {
 }
 
 int writeResponseToCSV(std::string fileName, std::string &response) {
-  //Parse a JSON string into DOM:
-  char * resp = new char [response.length()+1];
-  strcpy (resp, response.c_str());
-  rapidjson::Document json;
-  json.Parse(resp);
 
-  std::string arousalDominant = json["stats"]["arousal"]["dominant"].GetString();
-  float arousalVal = json["stats"]["arousal"]["sectors"]["relaxed"].GetFloat();
-  float arousalSecRelaxed = json["stats"]["arousal"]["sectors"]["relaxed"].GetFloat();
-  float arousalSecPassive = json["stats"]["arousal"]["sectors"]["passive"].GetFloat();
-  float arousalSecCalm = json["stats"]["arousal"]["sectors"]["calm"].GetFloat();
-  float arousalSecActivated = json["stats"]["arousal"]["sectors"]["activated"].GetFloat();
-  float arousalSecExcited = json["stats"]["arousal"]["sectors"]["excited"].GetFloat();
+	//blank response strings for empty response:
+	std::string arousalDominant = "";
+	std::string arousalVal = "";
+	std::string arousalSecRelaxed = "";
+	std::string arousalSecPassive = "";
+	std::string arousalSecCalm = "";
+	std::string arousalSecActivated = "";
+	std::string arousalSecExcited = "";
 
-  //compile csv line:
-  std::string writeData = arousalDominant + ","
-      + std::to_string(arousalVal) + ","
-      + std::to_string(arousalSecRelaxed) + ","
-      + std::to_string(arousalSecPassive) + ","
-      + std::to_string(arousalSecCalm) + ","
-      + std::to_string(arousalSecActivated) + ","
-      + std::to_string(arousalSecExcited) + ","
-      + "\n";
+	try {
+		//Parse a JSON string into DOM:
+		char * resp = new char[response.length() + 1];
+		strcpy(resp, response.c_str());
+		//Note: rapidjson has been used an example to parse the API response
+		rapidjson::Document json;
+		if (json.Parse(resp).HasParseError()) {
+			//In case of parsing errors skip writing parsed json response to CSV
+			//Due to parsing errors few asserstions fail in rapidjson which terminates the application
+		} else {
+			// write the valid parsed json response only to CSV
+			arousalDominant = json["stats"]["arousal"]["dominant"].GetString();
+			if (json["stats"]["arousal"]["value"].IsFloat()) arousalVal = std::to_string(json["stats"]["arousal"]["value"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["relaxed"].IsFloat()) arousalSecRelaxed = std::to_string(json["stats"]["arousal"]["sectors"]["relaxed"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["passive"].IsFloat()) arousalSecPassive = std::to_string(json["stats"]["arousal"]["sectors"]["passive"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["calm"].IsFloat()) arousalSecCalm = std::to_string(json["stats"]["arousal"]["sectors"]["calm"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["activated"].IsFloat()) arousalSecActivated = std::to_string(json["stats"]["arousal"]["sectors"]["activated"].GetFloat());
+			if (json["stats"]["arousal"]["sectors"]["excited"].IsFloat()) arousalSecExcited = std::to_string(json["stats"]["arousal"]["sectors"]["excited"].GetFloat());
 
-//  //modify it by DOM.
-//  rapidjson::Value& s = d["stars"];
-//  s.SetInt(s.GetInt() + 1);
+			//compile csv line:
+			std::string writeData = arousalDominant + ","
+				+ arousalVal + ","
+				+ arousalSecRelaxed + ","
+				+ arousalSecPassive + ","
+				+ arousalSecCalm + ","
+				+ arousalSecActivated + ","
+				+ arousalSecExcited + ","
+				+ "\n";
 
-//  //Convert JSON back to string:
-//  rapidjson::StringBuffer buffer;
-//  rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-//  json.Accept(writer);
+			writeToFile(fileName, writeData);
+		}
 
-//  //write full JSON to file:
-//  std::string data = buffer.GetString();
-//  data += "\n";
-//  std::string fileName = "responses.txt";
 
-  writeToFile(fileName, writeData);
+	}
+	catch (...) {
+		std::cout << "Response JSON not valid, readable, or error in parsing" << std::endl;
+	}
 
-  return 0;
+	return 0;
 }
 
 int writeResponseToText(std::string fileName, std::string response) {
